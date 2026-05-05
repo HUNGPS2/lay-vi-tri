@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Chấm Công — Xác Nhận Vị Trí</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f0f4f8;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 32px 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        h2 { color: #333; margin-bottom: 8px; }
+        p  { color: #666; font-size: 14px; }
+        button {
+            margin-top: 20px;
+            padding: 14px 32px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+        }
+        #btnGet  { background: #0088cc; color: white; }
+        #btnSend { background: #28a745; color: white; display: none; }
+        #status  { margin-top: 16px; font-size: 14px; color: #333; min-height: 60px; }
+        .ok   { color: #28a745; font-weight: bold; }
+        .err  { color: #dc3545; font-weight: bold; }
+        .info { color: #555; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>📍 Chấm Công</h2>
+    <p>Bấm nút bên dưới để xác nhận vị trí của bạn.<br>Trình duyệt sẽ hỏi quyền truy cập vị trí — hãy chọn <b>Cho phép</b>.</p>
+
+    <button id="btnGet" onclick="layViTri()">📡 Lấy vị trí</button>
+    <button id="btnSend" onclick="guiViTri()">✅ Xác nhận & Gửi</button>
+
+    <div id="status"></div>
+</div>
+
+<script>
+    // Đọc tham số từ URL: ?chat_id=xxx&n8n_url=http://...
+    const params   = new URLSearchParams(window.location.search);
+    const chatId   = params.get('chat_id')  || '';
+    const n8nUrl   = params.get('n8n_url')  || 'https://n8n.cpart.vn/webhook/lay-vi-tri';
+
+    let savedLat = null;
+    let savedLon = null;
+
+    function setStatus(msg, cls) {
+        const el = document.getElementById('status');
+        el.innerHTML = msg;
+        el.className = cls || '';
+    }
+
+    function layViTri() {
+        if (!chatId) {
+            setStatus('❌ Thiếu chat_id trong URL. Hãy mở link từ Telegram.', 'err');
+            return;
+        }
+        if (!navigator.geolocation) {
+            setStatus('❌ Trình duyệt không hỗ trợ định vị.', 'err');
+            return;
+        }
+
+        document.getElementById('btnGet').disabled = true;
+        setStatus('⏳ Đang xác định vị trí...', 'info');
+
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                savedLat = pos.coords.latitude;
+                savedLon = pos.coords.longitude;
+                const acc = Math.round(pos.coords.accuracy);
+
+                setStatus(
+                    `✅ Đã lấy vị trí<br>` +
+                    `Vĩ độ: <b>${savedLat.toFixed(6)}</b><br>` +
+                    `Kinh độ: <b>${savedLon.toFixed(6)}</b><br>` +
+                    `Độ chính xác: ±${acc} mét`,
+                    'ok'
+                );
+                document.getElementById('btnSend').style.display = 'block';
+                document.getElementById('btnGet').textContent = '🔄 Lấy lại vị trí';
+                document.getElementById('btnGet').disabled = false;
+            },
+            function(err) {
+                document.getElementById('btnGet').disabled = false;
+                setStatus('❌ Lỗi: ' + err.message, 'err');
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+        );
+    }
+
+    function guiViTri() {
+        if (savedLat === null || savedLon === null) {
+            setStatus('⚠️ Chưa có vị trí. Hãy bấm "Lấy vị trí" trước.', 'err');
+            return;
+        }
+
+        document.getElementById('btnSend').disabled = true;
+        setStatus('⏳ Đang gửi về hệ thống...', 'info');
+
+        fetch(n8nUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id:   chatId,
+                latitude:  savedLat,
+                longitude: savedLon
+            })
+        })
+        .then(function(res) {
+            if (res.ok) {
+                setStatus(
+                    '🎉 <b>Gửi thành công!</b><br>' +
+                    'Workflow đang xử lý chấm công.<br>' +
+                    'Kiểm tra Telegram để nhận kết quả.',
+                    'ok'
+                );
+                document.getElementById('btnSend').style.display = 'none';
+                document.getElementById('btnGet').style.display  = 'none';
+            } else {
+                setStatus('❌ Server trả lỗi: ' + res.status, 'err');
+                document.getElementById('btnSend').disabled = false;
+            }
+        })
+        .catch(function(err) {
+            setStatus('❌ Không kết nối được n8n.<br>Kiểm tra n8n đang chạy và URL đúng.<br>Lỗi: ' + err.message, 'err');
+            document.getElementById('btnSend').disabled = false;
+        });
+    }
+</script>
+</body>
+</html>
