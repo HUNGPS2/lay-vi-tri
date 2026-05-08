@@ -121,6 +121,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id:   chatId,
+                group_id:  groupId || '',   // ✅ thêm dòng này
                 latitude:  savedLat,
                 longitude: savedLon
             })
