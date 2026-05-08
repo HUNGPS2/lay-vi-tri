@@ -57,6 +57,7 @@
     // Đọc tham số từ URL: ?chat_id=xxx&n8n_url=http://...
     const params   = new URLSearchParams(window.location.search);
     const chatId   = params.get('chat_id')  || '';
+    const groupId = params.get('group_id');
     const n8nUrl   = params.get('n8n_url')  || 'https://n8n.cpart.vn/webhook/lay-vi-tri';
 
     let savedLat = null;
